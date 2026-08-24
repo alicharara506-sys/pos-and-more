@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "SalesMaster Pro",
+    "slug": "salesmaster-pro",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.salesmasterpro.app"
+    },
+    "android": {
+      "package": "com.salesmasterpro.app"
+    }
+  }
+}
