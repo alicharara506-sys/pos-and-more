@@ -68,6 +68,13 @@ export class AuthController {
     });
     return res.json({
       user: { id: user.id, email: user.email, name: user.name, mfaEnabled: user.mfaEnabled },
+      // apps/web relies on the httpOnly cookie above and ignores this field.
+      // Native clients (apps/mobile) can't read an httpOnly cookie from
+      // fetch, so the raw token is also returned here for them to store in
+      // SecureStore and send back as `Authorization: Bearer <token>` — see
+      // SessionAuthGuard, which already accepts either.
+      sessionToken: session.rawToken,
+      sessionExpiresAt: session.expiresAt,
     });
   }
 

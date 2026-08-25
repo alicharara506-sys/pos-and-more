@@ -2,23 +2,32 @@
   "name": "@salesmaster/mobile",
   "version": "0.1.0",
   "private": true,
-  "main": "node_modules/expo/AppEntry.js",
+  "main": "index.js",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "typecheck": "tsc --noEmit",
     "lint": "echo \"no lint config yet\"",
-    "test": "echo \"no tests yet — offline sync engine is not implemented in this phase\""
+    "test": "echo \"offline-sync logic is unit tested in packages/offline-sync; this app is UI/platform wiring over it\""
   },
   "dependencies": {
+    "@babel/runtime": "^7.25.0",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "@react-native-community/netinfo": "11.3.1",
+    "@salesmaster/contracts": "workspace:*",
+    "@salesmaster/offline-sync": "workspace:*",
     "expo": "~51.0.28",
+    "expo-crypto": "~13.0.2",
+    "expo-secure-store": "~13.0.2",
+    "expo-sqlite": "~14.0.6",
     "expo-status-bar": "~1.12.1",
     "react": "18.2.0",
     "react-native": "0.74.5"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@types/node": "^22.7.4",
     "@types/react": "^18.3.11",
     "typescript": "^5.6.3"
   }

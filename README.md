@@ -6,9 +6,9 @@ medium-sized businesses.
 ## What's implemented in this phase
 
 This repository is being built against the full SalesMaster Pro specification (see
-`docs/architecture.md` for the complete scope). **This phase delivers the foundation and a working
-web POS core** — it does not claim to implement every capability described in the long-term spec.
-Concretely, working today:
+`docs/architecture.md` for the complete scope). **This covers the foundation, the web POS core, and
+the offline-first mobile POS** — it does not claim to implement every capability described in the
+long-term spec. Concretely, working today:
 
 - Multi-tenant data model with enforced tenant isolation (Postgres + Prisma).
 - Email/password auth (with email verification), magic-link login, Google OAuth, Apple OAuth,
@@ -25,14 +25,19 @@ Concretely, working today:
 - A transactional outbox + a real BullMQ worker that drains it.
 - A platform-admin surface (separate auth path) for tenant search, MRR, and pricing-catalog edits.
 - OpenAPI docs for the whole API (`/docs` when running).
-- Automated tests: unit tests for the billing formula, money math, and stock-status logic;
-  integration tests for tenant isolation, the billing acceptance tests, auth, and sale/refund
-  ledger correctness — all run against a real Postgres instance, not mocks.
+- An offline-first React Native (Expo) POS: login, an on-device SQLite cache of the authorized
+  catalog/customer/branch data, a durable client-side mutation queue, and a background sync engine
+  that drains it against the real API with exponential backoff and a manual-retry "dead" state for
+  exhausted/permanent failures — see `docs/offline-sync.md`. The queue/backoff/sync-decision logic
+  is platform-agnostic (`packages/offline-sync`, 19 unit tests with an in-memory adapter); the app
+  supplies only the SQLite storage adapter and the NetInfo/API wiring.
+- Automated tests: unit tests for the billing formula, money math, stock-status logic, and the
+  offline mutation queue/sync engine; integration tests for tenant isolation, the billing
+  acceptance tests, auth, and sale/refund ledger correctness — all run against a real Postgres
+  instance, not mocks.
 
 **Deliberately not implemented yet** (see the relevant doc for the plan):
 
-- The React Native mobile app is a placeholder screen only — no offline-first POS, no local
-  SQLite cache, no sync engine. Design is documented in `docs/offline-sync.md` but not built.
 - The e-commerce integration hub (Shopify/WooCommerce/universal connector) — see
   `docs/integrations.md` for the intended architecture.
 - The AI sales assistant, QR code module, and scheduled/exported reports.
@@ -40,6 +45,12 @@ Concretely, working today:
   against their real SDKs behind typed adapters, but this environment has no real keys — every
   adapter reports itself honestly "not configured" rather than faking success (see
   `docs/security.md` and `.env.example`).
+
+**A note on mobile verification**: `apps/mobile`'s business logic is unit tested and its full
+source successfully bundles through the real Expo/Metro toolchain (`expo export`), but this
+development environment has no iOS/Android simulator or physical device, so the app has not been
+visually run or interacted with on a real target — see `docs/offline-sync.md`'s closing section
+for exactly what was and wasn't verified.
 
 ## Architecture
 
@@ -50,12 +61,13 @@ apps/
   api/      NestJS REST API (OpenAPI docs at /docs)
   web/      Next.js web app (onboarding, dashboard, POS, products, customers, invoices, expenses)
   worker/   BullMQ worker draining the transactional outbox
-  mobile/   Expo placeholder (not yet implemented — see docs/offline-sync.md)
+  mobile/   Expo/React Native offline-first POS (login, SQLite cache, mutation queue, sync engine)
 packages/
-  domain/       Pure business logic: billing formula, Money, permissions, stock-status
-  database/     Prisma schema, migrations, seed script
-  contracts/    Shared Zod schemas/DTOs used by both api and web
-  config/       Validated environment loader
+  domain/         Pure business logic: billing formula, Money, permissions, stock-status
+  database/       Prisma schema, migrations, seed script
+  contracts/      Shared Zod schemas/DTOs used by api, web, and mobile
+  config/         Validated environment loader
+  offline-sync/   Platform-agnostic mutation queue + sync engine (used by apps/mobile)
 docs/           architecture, data model, offline-sync, integrations, security, billing
 ```
 
@@ -93,10 +105,24 @@ pnpm --filter @salesmaster/worker dev   # drains the outbox in the background
 Then open http://localhost:3000, register an account, verify (the console-email adapter logs the
 verification link to the API's stdout in dev), and go through the onboarding wizard.
 
+### Mobile (offline POS)
+
+```bash
+cd apps/mobile
+cp .env.example .env    # sets EXPO_PUBLIC_API_URL — see below
+pnpm start               # opens Expo Dev Tools; scan the QR code with Expo Go, or press i/a for a simulator
+```
+
+`EXPO_PUBLIC_API_URL` should point at the same API instance as `apps/web`'s
+`NEXT_PUBLIC_API_URL` (e.g. `http://<your-machine-lan-ip>:4000/api/v1` — not `localhost`, since a
+physical device or simulator doesn't share your machine's `localhost`). Sign in with an account
+that already completed onboarding via the web app (the mobile app doesn't implement onboarding
+itself — see `docs/offline-sync.md`).
+
 ### Testing
 
 ```bash
-pnpm test:unit                                     # pure-logic unit tests (all packages)
+pnpm test:unit                                     # pure-logic unit tests (all packages, incl. packages/offline-sync)
 pnpm --filter @salesmaster/api test:integration     # API integration tests against a real Postgres
 ```
 
@@ -122,7 +148,7 @@ disposable Postgres service container.
 
 - `docs/architecture.md` — system boundaries, major flows, decisions
 - `docs/data-model.md` — entities, relationships, tenant-isolation strategy
-- `docs/offline-sync.md` — mobile offline design (not yet implemented)
+- `docs/offline-sync.md` — the mobile offline-first POS: mutation queue, sync engine, conflict rules
 - `docs/integrations.md` — commerce integration hub design (not yet implemented)
 - `docs/security.md` — threat model, auth, encryption, audit policy
 - `docs/billing.md` — the exact pricing/entitlement calculation
