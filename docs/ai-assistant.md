@@ -32,7 +32,7 @@ The assistant's entire read-only window onto tenant data is four fixed tools
 
 - `get_sales_summary(from, to, groupBy)` → `ReportsService.getSalesByPeriod`
 - `get_low_stock_items()` → `ReportsService.getLowStockItems` (new — the dashboard previously only
-  exposed low-stock *counts*; this returns the actual list)
+  exposed low-stock _counts_; this returns the actual list)
 - `get_inventory_valuation()` → `ReportsService.getInventoryValuation`
 - `get_dashboard_summary()` → `ReportsService.getDashboard`
 

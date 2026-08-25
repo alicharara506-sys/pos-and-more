@@ -38,6 +38,8 @@ jobs:
           pnpm --filter @salesmaster/contracts build
           pnpm --filter @salesmaster/config build
           pnpm --filter @salesmaster/offline-sync build
+          pnpm --filter @salesmaster/integrations build
+          pnpm --filter @salesmaster/notifications build
 
       - name: Format check
         run: pnpm format:check
@@ -146,6 +148,8 @@ jobs:
           pnpm --filter @salesmaster/contracts build
           pnpm --filter @salesmaster/config build
           pnpm --filter @salesmaster/offline-sync build
+          pnpm --filter @salesmaster/integrations build
+          pnpm --filter @salesmaster/notifications build
 
       - name: Apply migrations
         run: pnpm --filter @salesmaster/database exec prisma migrate deploy
@@ -185,6 +189,8 @@ jobs:
           pnpm --filter @salesmaster/contracts build
           pnpm --filter @salesmaster/config build
           pnpm --filter @salesmaster/offline-sync build
+          pnpm --filter @salesmaster/integrations build
+          pnpm --filter @salesmaster/notifications build
 
       - name: Build API
         run: pnpm --filter @salesmaster/api build

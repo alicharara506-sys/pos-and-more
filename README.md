@@ -176,4 +176,6 @@ disposable Postgres service container.
 - `docs/ai-assistant.md` — the AI assistant's adapter boundary, its read-only tool surface, and
   what's genuinely verified vs. not (no live model access in this environment)
 - `docs/security.md` — threat model, auth, encryption, audit policy
+- `docs/release-checklist.md` — release readiness: what's built and tested vs. what stands between
+  this repo and real production traffic
 - `docs/billing.md` — the exact pricing/entitlement calculation

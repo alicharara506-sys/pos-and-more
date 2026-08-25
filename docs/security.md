@@ -107,7 +107,25 @@ expired, or wrong-purpose token always resolves to a clean `401 Unauthorized`
 
 Global default (100 req/min/IP via `@nestjs/throttler`) plus tighter per-route limits on
 `register`, `login`, `password/forgot`, `password/reset`, `magic-link/*`, and `mfa/verify`
-(5–10 req/min) — the endpoints spec §3.2 explicitly calls out for abuse protection.
+(5–10 req/min) — the endpoints spec §3.2 explicitly calls out for abuse protection. `POST
+/assistant/ask` and `POST /invoices/:id/send` are also tighter (20 req/min) — both can trigger a
+real, billed external API call once a provider is configured, so the limit bounds cost from a
+runaway or spammed client, not just classic abuse.
+
+## Tenant isolation: a real gap found and fixed during hardening
+
+`InventoryService.recordMovement` (the single choke point every stock change goes through) never
+validated that a `variantId` belonged to the caller's tenant before writing `InventoryMovement`/
+`InventoryBalance` rows keyed by it. The POS sale path was always safe — `SalesService` validates
+every line's `variantId` against the tenant before ever calling `recordMovement` — but the manual
+adjustment and stock-transfer endpoints (`InventoryService.adjustStock`/`transferStock`) did not:
+a caller in tenant A could pass a tenant B `variantId` alongside one of tenant A's own stock
+locations, writing tenant A inventory rows against tenant B's product and — once the Phase 6
+low-stock alert started reading `variant.product.name` to build its email — leaking that product's
+name into tenant A's alert. Fixed by validating `variantId` (and every line's `variantId` for a
+transfer) against `tenantId` before the transaction runs, mirroring the pattern `SalesService`
+already used. Regression-tested in `apps/api/test/integration/tenant-isolation.spec.ts` (a
+cross-tenant adjustment and a cross-tenant transfer both now 404).
 
 ## What is honestly not done
 

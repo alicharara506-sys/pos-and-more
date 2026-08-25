@@ -20,6 +20,7 @@ describe('tenant isolation', () => {
   let tenantA: TestTenant;
   let tenantB: TestTenant;
   let productAId: string;
+  let productAVariantId: string;
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -45,6 +46,7 @@ describe('tenant isolation', () => {
       });
     expect(productRes.status).toBe(201);
     productAId = productRes.body.id;
+    productAVariantId = productRes.body.variants[0].id;
   });
 
   afterAll(async () => {
@@ -81,5 +83,53 @@ describe('tenant isolation', () => {
       .set('X-Tenant-Id', tenantA.tenantId);
     expect(res.status).toBe(200);
     expect(res.body.id).toBe(productAId);
+  });
+
+  it("rejects an inventory adjustment naming tenant A's variant against tenant B's own stock location", async () => {
+    const branches = await ownerB.agent
+      .get('/api/v1/branches')
+      .set('X-Tenant-Id', tenantB.tenantId);
+    const stockLocationId = branches.body[0].stockLocations[0].id;
+
+    const res = await ownerB.agent
+      .post('/api/v1/inventory/adjustments')
+      .set('X-Tenant-Id', tenantB.tenantId)
+      .send({
+        stockLocationId,
+        variantId: productAVariantId,
+        quantityDelta: 10,
+        type: 'OPENING_BALANCE',
+      });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("rejects a stock transfer naming tenant A's variant even between tenant B's own stock locations", async () => {
+    const beforeBranches = await ownerB.agent
+      .get('/api/v1/branches')
+      .set('X-Tenant-Id', tenantB.tenantId);
+    const fromLocationId = beforeBranches.body[0].stockLocations[0].id;
+
+    await ownerB.agent
+      .post('/api/v1/branches')
+      .set('X-Tenant-Id', tenantB.tenantId)
+      .send({ name: 'Second Branch', timezone: 'UTC', currency: 'USD' });
+    const afterBranches = await ownerB.agent
+      .get('/api/v1/branches')
+      .set('X-Tenant-Id', tenantB.tenantId);
+    const toLocationId = afterBranches.body.find(
+      (b: { id: string }) => b.stockLocations[0].id !== fromLocationId,
+    ).stockLocations[0].id;
+
+    const res = await ownerB.agent
+      .post('/api/v1/inventory/transfers')
+      .set('X-Tenant-Id', tenantB.tenantId)
+      .send({
+        fromStockLocationId: fromLocationId,
+        toStockLocationId: toLocationId,
+        lines: [{ variantId: productAVariantId, quantity: 1 }],
+      });
+
+    expect(res.status).toBe(404);
   });
 });

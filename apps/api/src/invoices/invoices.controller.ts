@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { PERMISSIONS } from '@salesmaster/domain';
 import {
   createInvoiceSchema,
@@ -94,6 +95,9 @@ export class InvoicesController {
     return this.invoices.getQrCode(tenantId, id);
   }
 
+  // Each call can trigger a real, billed email/SMS send once a provider is
+  // configured — bounds cost from a spammed button, not just abuse.
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @UseGuards(SessionAuthGuard, TenantGuard, RbacGuard)
   @Post('invoices/:id/send')
   @RequirePermissions(PERMISSIONS.INVOICES_MANAGE)

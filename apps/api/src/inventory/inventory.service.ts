@@ -138,10 +138,14 @@ export class InventoryService {
   }
 
   async adjustStock(tenantId: string, actorUserId: string, input: CreateInventoryAdjustmentInput) {
-    const stockLocation = await this.prisma.client.stockLocation.findFirst({
-      where: { id: input.stockLocationId, tenantId },
-    });
+    const [stockLocation, variant] = await Promise.all([
+      this.prisma.client.stockLocation.findFirst({
+        where: { id: input.stockLocationId, tenantId },
+      }),
+      this.prisma.client.productVariant.findFirst({ where: { id: input.variantId, tenantId } }),
+    ]);
     if (!stockLocation) throw new NotFoundException('Stock location not found');
+    if (!variant) throw new NotFoundException('Product variant not found');
 
     return this.prisma.client.$transaction(async (tx) => {
       const movement = await this.recordMovement(
@@ -183,15 +187,23 @@ export class InventoryService {
       throw new BadRequestException('Source and destination stock locations must differ');
     }
 
-    const [from, to] = await Promise.all([
+    const variantIds = input.lines.map((l) => l.variantId);
+    const [from, to, variants] = await Promise.all([
       this.prisma.client.stockLocation.findFirst({
         where: { id: input.fromStockLocationId, tenantId },
       }),
       this.prisma.client.stockLocation.findFirst({
         where: { id: input.toStockLocationId, tenantId },
       }),
+      this.prisma.client.productVariant.findMany({
+        where: { id: { in: variantIds }, tenantId },
+        select: { id: true },
+      }),
     ]);
     if (!from || !to) throw new NotFoundException('Stock location not found');
+    if (variants.length !== new Set(variantIds).size) {
+      throw new NotFoundException('One or more product variants not found');
+    }
 
     return this.prisma.client.$transaction(async (tx) => {
       const transfer = await tx.stockTransfer.create({
