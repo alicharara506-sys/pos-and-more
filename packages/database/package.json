@@ -7,10 +7,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "generate": "prisma generate",
-    "migrate": "prisma migrate dev",
-    "migrate:deploy": "prisma migrate deploy",
-    "seed": "tsx prisma/seed.ts",
-    "studio": "prisma studio",
+    "migrate": "node scripts/with-env.js prisma migrate dev",
+    "migrate:deploy": "node scripts/with-env.js prisma migrate deploy",
+    "seed": "node scripts/with-env.js tsx prisma/seed.ts",
+    "studio": "node scripts/with-env.js prisma studio",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts",
     "test": "echo \"no tests in database package\""
