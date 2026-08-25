@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { href: '/expenses', label: 'Expenses', icon: '💳' },
   { href: '/reports', label: 'Reports', icon: '📊' },
   { href: '/integrations', label: 'Integrations', icon: '🔌' },
+  { href: '/assistant', label: 'AI Assistant', icon: '🤖' },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

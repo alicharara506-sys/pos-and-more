@@ -50,13 +50,20 @@ long-term spec. Concretely, working today:
   server-side (the `qrcode` library) and rendered in the dashboard.
 - Extended reporting: a sales-by-period report (day/week/month buckets, zero-filled) with CSV
   export, and a real-time inventory valuation report — both in `apps/web`'s Reports page.
+- An AI sales assistant (`apps/web`'s Assistant page, `POST /assistant/ask`): a tool-use loop
+  against the real Anthropic API (`@anthropic-ai/sdk`) restricted to four read-only, tenant-scoped
+  business-report tools — never raw database access. Honestly reports itself "not configured" when
+  no `ANTHROPIC_API_KEY` is set (this environment's default) rather than fabricating an answer; see
+  `docs/ai-assistant.md` for exactly what's verified vs. not (no live model has answered a question
+  through this code path in this environment — only the unconfigured fallback has been exercised).
 
 **Deliberately not implemented yet** (see the relevant doc for the plan):
 
-- The AI sales assistant.
 - Scheduled/recurring report delivery (email digests) — reports are on-demand only in this phase.
-- Live third-party credentials: Google/Apple OAuth, Stripe, Resend, and Twilio are wired against
-  their real SDKs/APIs behind typed adapters, but this environment has no real keys — every
+- Persisted AI assistant conversation history, streaming responses, and assistant-initiated write
+  actions (it can only read/report, never create a sale or send an invoice on your behalf).
+- Live third-party credentials: Google/Apple OAuth, Stripe, Resend, Twilio, and Anthropic are wired
+  against their real SDKs/APIs behind typed adapters, but this environment has no real keys — every
   adapter reports itself honestly "not configured" rather than faking success (see
   `docs/security.md` and `.env.example`).
 
@@ -166,5 +173,7 @@ disposable Postgres service container.
 - `docs/integrations.md` — commerce integration hub: what's implemented (WooCommerce) and what isn't
 - `docs/notifications.md` — email/SMS provider adapters, the outbox-driven and on-demand delivery
   paths, and the low-stock alert crossing logic
+- `docs/ai-assistant.md` — the AI assistant's adapter boundary, its read-only tool surface, and
+  what's genuinely verified vs. not (no live model access in this environment)
 - `docs/security.md` — threat model, auth, encryption, audit policy
 - `docs/billing.md` — the exact pricing/entitlement calculation

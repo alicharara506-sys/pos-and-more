@@ -25,6 +25,7 @@
     "@salesmaster/integrations": "workspace:*",
     "@salesmaster/notifications": "workspace:*",
     "argon2": "^0.41.1",
+    "@anthropic-ai/sdk": "^0.120.0",
     "cookie-parser": "^1.4.7",
     "express": "^4.21.1",
     "helmet": "^7.1.0",

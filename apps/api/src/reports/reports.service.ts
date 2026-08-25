@@ -280,6 +280,34 @@ export class ReportsService {
 
     return { currency: 'USD', totalValue: grandTotal.toDecimalString(), items };
   }
+
+  /** Variants currently at or below their reorder point (red) or in the warning buffer (yellow). */
+  async getLowStockItems(tenantId: string) {
+    const variants = await this.prisma.client.productVariant.findMany({
+      where: { tenantId, status: 'ACTIVE' },
+      include: { product: true, inventoryBalances: true },
+    });
+
+    return variants
+      .map((variant) => {
+        const quantity = variant.inventoryBalances.reduce((sum, b) => sum + b.quantity, 0);
+        const status = computeStockStatus({
+          availableQuantity: quantity,
+          reorderPoint: variant.reorderPoint,
+          warningBuffer: variant.reorderBuffer,
+        });
+        return {
+          variantId: variant.id,
+          productName: variant.product.name,
+          sku: variant.sku,
+          quantity,
+          reorderPoint: variant.reorderPoint,
+          status,
+        };
+      })
+      .filter((item) => item.status !== 'green')
+      .sort((a, b) => a.quantity - b.quantity);
+  }
 }
 
 function periodLabel(date: Date, groupBy: 'day' | 'week' | 'month'): string {

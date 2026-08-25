@@ -23,6 +23,7 @@ import { ReportsModule } from './reports/reports.module';
 import { AdminModule } from './admin/admin.module';
 import { HealthModule } from './health/health.module';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { AssistantModule } from './assistant/assistant.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
     AdminModule,
     HealthModule,
     IntegrationsModule,
+    AssistantModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
