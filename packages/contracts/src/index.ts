@@ -8,3 +8,4 @@ export * from './sales';
 export * from './invoices';
 export * from './expenses';
 export * from './integrations';
+export * from './reports';

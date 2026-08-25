@@ -1,27 +1,19 @@
 import { Module } from '@nestjs/common';
 import { loadEnv } from '@salesmaster/config';
+import { resolveEmailAdapter } from '@salesmaster/notifications';
 import { EMAIL_ADAPTER } from './email-adapter.interface';
-import { ConsoleEmailAdapter } from './console-email.adapter';
 
 /**
- * Only a console adapter ships today (EMAIL_PROVIDER=console). SendGrid/Resend
- * adapters are stubbed out in .env.example and docs/integrations.md but not
- * implemented — wiring a real provider here is future work; this module is
- * the only place that would need to change.
+ * Binds the DI token to whichever adapter `resolveEmailAdapter` selects for
+ * the configured EMAIL_PROVIDER (console/resend today; sendgrid throws an
+ * honest "not implemented" error rather than silently no-op — see
+ * packages/notifications/src/resolve.ts, the one place that mapping lives).
  */
 @Module({
   providers: [
     {
       provide: EMAIL_ADAPTER,
-      useFactory: () => {
-        const env = loadEnv();
-        if (env.EMAIL_PROVIDER !== 'console') {
-          throw new Error(
-            `EMAIL_PROVIDER=${env.EMAIL_PROVIDER} has no adapter implementation yet; only "console" ships in this phase.`,
-          );
-        }
-        return new ConsoleEmailAdapter();
-      },
+      useFactory: () => resolveEmailAdapter(loadEnv()),
     },
   ],
   exports: [EMAIL_ADAPTER],

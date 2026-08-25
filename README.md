@@ -42,12 +42,21 @@ long-term spec. Concretely, working today:
   `apps/web` — see `docs/integrations.md` for exactly what is and isn't covered (Shopify and other
   providers, order→sale materialization, and inbound inventory sync are explicitly out of scope
   for this phase).
+- Email/SMS notifications on typed provider adapters (Resend, Twilio) — welcome/invitation emails,
+  invoice issued/paid receipts, and low-stock alerts fire automatically through the transactional
+  outbox; a cashier can also send an invoice on demand by email or SMS. See `docs/notifications.md`
+  for what's genuinely wired vs. still a "not configured" honest fallback.
+- QR codes for a product's SKU (label printing) and an invoice's public view link, generated
+  server-side (the `qrcode` library) and rendered in the dashboard.
+- Extended reporting: a sales-by-period report (day/week/month buckets, zero-filled) with CSV
+  export, and a real-time inventory valuation report — both in `apps/web`'s Reports page.
 
 **Deliberately not implemented yet** (see the relevant doc for the plan):
 
-- The AI sales assistant, QR code module, and scheduled/exported reports.
-- Live third-party credentials: Google/Apple OAuth, Stripe, and email/SMS providers are wired
-  against their real SDKs behind typed adapters, but this environment has no real keys — every
+- The AI sales assistant.
+- Scheduled/recurring report delivery (email digests) — reports are on-demand only in this phase.
+- Live third-party credentials: Google/Apple OAuth, Stripe, Resend, and Twilio are wired against
+  their real SDKs/APIs behind typed adapters, but this environment has no real keys — every
   adapter reports itself honestly "not configured" rather than faking success (see
   `docs/security.md` and `.env.example`).
 
@@ -155,5 +164,7 @@ disposable Postgres service container.
 - `docs/data-model.md` — entities, relationships, tenant-isolation strategy
 - `docs/offline-sync.md` — the mobile offline-first POS: mutation queue, sync engine, conflict rules
 - `docs/integrations.md` — commerce integration hub: what's implemented (WooCommerce) and what isn't
+- `docs/notifications.md` — email/SMS provider adapters, the outbox-driven and on-demand delivery
+  paths, and the low-stock alert crossing logic
 - `docs/security.md` — threat model, auth, encryption, audit policy
 - `docs/billing.md` — the exact pricing/entitlement calculation

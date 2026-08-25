@@ -1,24 +1,8 @@
-export interface SendEmailInput {
-  to: string;
-  subject: string;
-  text: string;
-  html?: string;
-}
-
-export interface SendEmailResult {
-  delivered: boolean;
-  provider: string;
-  providerMessageId?: string;
-}
+export type { EmailAdapter, SendEmailInput, SendEmailResult } from '@salesmaster/notifications';
 
 /**
- * Typed provider boundary for transactional email (section 1.2: keep
- * external providers behind typed adapter interfaces). Swap the bound
- * implementation in email.module.ts based on EMAIL_PROVIDER — nothing else
- * in the codebase should import a concrete provider SDK directly.
+ * NestJS DI token for the bound `EmailAdapter` — see email.module.ts. The
+ * adapter implementations themselves live in `@salesmaster/notifications`
+ * so apps/worker can use them too without importing across apps.
  */
 export const EMAIL_ADAPTER = Symbol('EMAIL_ADAPTER');
-
-export interface EmailAdapter {
-  send(input: SendEmailInput): Promise<SendEmailResult>;
-}

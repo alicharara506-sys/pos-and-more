@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: '/customers', label: 'Customers', icon: '👥' },
   { href: '/invoices', label: 'Invoices', icon: '📄' },
   { href: '/expenses', label: 'Expenses', icon: '💳' },
+  { href: '/reports', label: 'Reports', icon: '📊' },
   { href: '/integrations', label: 'Integrations', icon: '🔌' },
 ];
 

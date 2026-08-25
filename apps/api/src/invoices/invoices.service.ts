@@ -1,15 +1,20 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { nanoid } from 'nanoid';
+import { loadEnv } from '@salesmaster/config';
 import { Money } from '@salesmaster/domain';
 import { InvoiceStatus, PaymentStatus, QuoteStatus, type Prisma } from '@salesmaster/database';
 import type {
   CreateInvoiceInput,
   CreateQuoteInput,
   RecordInvoicePaymentInput,
+  SendInvoiceInput,
 } from '@salesmaster/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { OutboxService } from '../outbox/outbox.service';
+import { EMAIL_ADAPTER, type EmailAdapter } from '../notifications/email/email-adapter.interface';
+import { SMS_ADAPTER, type SmsAdapter } from '../notifications/sms/sms-adapter.interface';
+import { QrService } from '../common/qr/qr.service';
 
 type PrismaTx = Prisma.TransactionClient;
 
@@ -19,7 +24,23 @@ export class InvoicesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
+    @Inject(EMAIL_ADAPTER) private readonly email: EmailAdapter,
+    @Inject(SMS_ADAPTER) private readonly sms: SmsAdapter,
+    private readonly qr: QrService,
   ) {}
+
+  /** The public view link, QR-encoded — scan it at the counter to pull up the invoice on a phone. */
+  async getQrCode(
+    tenantId: string,
+    invoiceId: string,
+  ): Promise<{ dataUrl: string; viewUrl: string }> {
+    const invoice = await this.prisma.client.invoice.findFirst({
+      where: { id: invoiceId, tenantId },
+    });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    const viewUrl = `${loadEnv().APP_URL}/public/invoices/${invoice.publicToken}`;
+    return { dataUrl: await this.qr.toDataUrl(viewUrl), viewUrl };
+  }
 
   private async generateInvoiceNumber(tx: PrismaTx, tenantId: string): Promise<string> {
     const count = await tx.invoice.count({ where: { tenantId } });
@@ -215,6 +236,56 @@ export class InvoicesService {
       entityId: invoiceId,
     });
     return updated;
+  }
+
+  /**
+   * On-demand delivery, distinct from the automatic invoice.issued/paid
+   * outbox-driven emails (apps/worker) — this is a cashier explicitly
+   * clicking "Send" and wanting to know right now whether it actually went
+   * out, so it calls the adapter directly rather than queuing it. Honest
+   * result: `delivered` reflects what the adapter actually reports, never
+   * assumed true just because the request didn't throw.
+   */
+  async send(tenantId: string, actorUserId: string, invoiceId: string, input: SendInvoiceInput) {
+    const invoice = await this.prisma.client.invoice.findFirst({
+      where: { id: invoiceId, tenantId },
+      include: { customer: true, tenant: true },
+    });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    if (invoice.publicTokenRevokedAt) {
+      throw new BadRequestException("This invoice's public link has been revoked");
+    }
+
+    const viewUrl = `${loadEnv().APP_URL}/public/invoices/${invoice.publicToken}`;
+    const message = `Invoice ${invoice.number} from ${invoice.tenant.displayName}: ${invoice.currency} ${invoice.total.toString()}. View and pay: ${viewUrl}`;
+
+    let result: { delivered: boolean; provider: string };
+    if (input.channel === 'email') {
+      if (!invoice.customer.email) {
+        throw new BadRequestException('This customer has no email address on file');
+      }
+      result = await this.email.send({
+        to: invoice.customer.email,
+        subject: `Invoice ${invoice.number} from ${invoice.tenant.displayName}`,
+        text: message,
+      });
+    } else {
+      if (!invoice.customer.phone) {
+        throw new BadRequestException('This customer has no phone number on file');
+      }
+      result = await this.sms.send({ to: invoice.customer.phone, body: message });
+    }
+
+    await this.audit.record({
+      tenantId,
+      actorUserId,
+      action: 'invoices.sent',
+      entityType: 'Invoice',
+      entityId: invoiceId,
+      metadata: { channel: input.channel, delivered: result.delivered, provider: result.provider },
+    });
+
+    return result;
   }
 
   async revokePublicLink(tenantId: string, actorUserId: string, invoiceId: string) {

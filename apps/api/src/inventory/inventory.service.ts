@@ -1,11 +1,13 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InventoryMovementType, StockTransferStatus, type Prisma } from '@salesmaster/database';
+import { computeStockStatus } from '@salesmaster/domain';
 import type {
   CreateInventoryAdjustmentInput,
   CreateStockTransferInput,
 } from '@salesmaster/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { OutboxService } from '../outbox/outbox.service';
 
 type PrismaTx = Prisma.TransactionClient;
 
@@ -37,6 +39,7 @@ export class InventoryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly outbox: OutboxService,
   ) {}
 
   async recordMovement(input: RecordMovementInput, tx: PrismaTx) {
@@ -63,7 +66,7 @@ export class InventoryService {
       update: { quantity: { increment: input.quantityDelta } },
     });
 
-    return tx.inventoryMovement.create({
+    const movement = await tx.inventoryMovement.create({
       data: {
         tenantId: input.tenantId,
         branchId: input.branchId,
@@ -79,6 +82,59 @@ export class InventoryService {
         idempotencyKey: input.idempotencyKey,
       },
     });
+
+    await this.maybePublishLowStockAlert(input, balance.quantity, tx);
+
+    return movement;
+  }
+
+  /**
+   * Fires an outbox event only on the transition INTO 'red' status, never
+   * on every movement while already red — otherwise every subsequent sale
+   * of an out-of-stock item would re-alert. The previous quantity is
+   * derived from the post-upsert balance minus this movement's delta rather
+   * than a separate read, since the row's lock (held for the upsert above)
+   * already serializes concurrent writers on it within this transaction.
+   */
+  private async maybePublishLowStockAlert(
+    input: RecordMovementInput,
+    newQuantity: number,
+    tx: PrismaTx,
+  ): Promise<void> {
+    const previousQuantity = newQuantity - input.quantityDelta;
+    const variant = await tx.productVariant.findUnique({
+      where: { id: input.variantId },
+      include: { product: true },
+    });
+    if (!variant) return;
+
+    const statusInput = {
+      reorderPoint: variant.reorderPoint,
+      warningBuffer: variant.reorderBuffer,
+    };
+    const previousStatus = computeStockStatus({
+      ...statusInput,
+      availableQuantity: previousQuantity,
+    });
+    const newStatus = computeStockStatus({ ...statusInput, availableQuantity: newQuantity });
+    if (newStatus !== 'red' || previousStatus === 'red') return;
+
+    await this.outbox.publish(
+      {
+        aggregateType: 'InventoryBalance',
+        aggregateId: `${input.stockLocationId}:${input.variantId}`,
+        eventType: 'inventory.low_stock',
+        payload: {
+          tenantId: input.tenantId,
+          variantId: input.variantId,
+          stockLocationId: input.stockLocationId,
+          productName: variant.product.name,
+          sku: variant.sku,
+          quantity: newQuantity,
+        },
+      },
+      tx,
+    );
   }
 
   async adjustStock(tenantId: string, actorUserId: string, input: CreateInventoryAdjustmentInput) {

@@ -15,8 +15,8 @@
                         │          apps/worker           │──────▶ Redis (BullMQ)
                         │  polls OutboxEvent, enqueues   │
                         │  jobs, is the only place that   │
-                        │  would call a real notification │
-                        │  provider                        │
+                        │  calls the email/SMS provider    │
+                        │  adapter (packages/notifications)│
                         └──────────────────────────────┘
 
 apps/mobile — Expo placeholder only, not wired to the API yet (docs/offline-sync.md).
@@ -57,9 +57,9 @@ Every app depends on the shared `packages/*` libraries rather than duplicating l
 
 ## Transactional outbox
 
-Slow or retryable work (today: logging what a notification _would_ send — see
-`docs/integrations.md` for why no real provider is wired up in this environment) must never block
-or be lost relative to the domain write that triggered it. The pattern:
+Slow or retryable work (email/SMS via `packages/notifications`'s typed adapters — see
+`docs/notifications.md`) must never block or be lost relative to the domain write that triggered
+it. The pattern:
 
 1. Inside the same `$transaction` as the domain write (e.g. creating a `Sale`), insert an
    `OutboxEvent` row (`aggregateType`, `aggregateId`, `eventType`, `payload`).

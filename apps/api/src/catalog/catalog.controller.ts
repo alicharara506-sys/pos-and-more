@@ -40,6 +40,12 @@ export class CatalogController {
     return this.catalog.getProduct(tenantId, id);
   }
 
+  @Get('variants/:variantId/qr')
+  @RequirePermissions(PERMISSIONS.INVENTORY_VIEW)
+  async variantQr(@CurrentTenantId() tenantId: string, @Param('variantId') variantId: string) {
+    return this.catalog.getVariantQrCode(tenantId, variantId);
+  }
+
   @Post()
   @RequirePermissions(PERMISSIONS.PRODUCTS_MANAGE)
   async create(

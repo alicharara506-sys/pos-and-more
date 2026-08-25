@@ -26,6 +26,8 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [qrVariantId, setQrVariantId] = useState<string | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '',
     sku: '',
@@ -79,6 +81,22 @@ export default function ProductsPage() {
       setError(err instanceof Error ? err.message : 'Could not create product');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function toggleQr(variantId: string) {
+    if (qrVariantId === variantId) {
+      setQrVariantId(null);
+      setQrDataUrl(null);
+      return;
+    }
+    setQrVariantId(variantId);
+    setQrDataUrl(null);
+    try {
+      const result = await api<{ dataUrl: string }>(`/products/variants/${variantId}/qr`);
+      setQrDataUrl(result.dataUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load QR code');
     }
   }
 
@@ -162,11 +180,12 @@ export default function ProductsPage() {
               <th className="p-3">Cost</th>
               <th className="p-3">Retail</th>
               <th className="p-3">Stock</th>
+              <th className="p-3">Label</th>
             </tr>
           </thead>
           <tbody>
             {products?.flatMap((p) =>
-              p.variants.map((v) => (
+              p.variants.flatMap((v) => [
                 <tr key={v.id} className="border-t border-gray-100 dark:border-gray-800">
                   <td className="p-3">{p.name}</td>
                   <td className="p-3 text-gray-500">{v.sku}</td>
@@ -178,8 +197,31 @@ export default function ProductsPage() {
                       <span className="text-xs text-gray-400">{v.availableQuantity} on hand</span>
                     </div>
                   </td>
-                </tr>
-              )),
+                  <td className="p-3">
+                    <button
+                      onClick={() => toggleQr(v.id)}
+                      className="text-xs text-brand-600 hover:underline"
+                    >
+                      {qrVariantId === v.id ? 'Hide QR' : 'QR code'}
+                    </button>
+                  </td>
+                </tr>,
+                qrVariantId === v.id ? (
+                  <tr key={`${v.id}-qr`} className="border-t border-gray-100 dark:border-gray-800">
+                    <td colSpan={6} className="p-3">
+                      {qrDataUrl ? (
+                        <img
+                          src={qrDataUrl}
+                          alt={`QR code for SKU ${v.sku}`}
+                          className="h-32 w-32"
+                        />
+                      ) : (
+                        <p className="text-sm text-gray-500">Loading…</p>
+                      )}
+                    </td>
+                  </tr>
+                ) : null,
+              ]),
             )}
           </tbody>
         </table>

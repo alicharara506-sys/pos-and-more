@@ -20,6 +20,11 @@ export const createInvoiceSchema = z.object({
 });
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
 
+export const sendInvoiceSchema = z.object({
+  channel: z.enum(['email', 'sms']),
+});
+export type SendInvoiceInput = z.infer<typeof sendInvoiceSchema>;
+
 export const recordInvoicePaymentSchema = z.object({
   amount: z.number().positive(),
   method: z.enum(['CASH', 'CARD', 'BANK_TRANSFER', 'MOBILE_MONEY', 'CUSTOMER_CREDIT', 'CUSTOM']),

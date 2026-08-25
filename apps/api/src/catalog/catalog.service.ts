@@ -8,13 +8,27 @@ import type {
 import { ProductStatus } from '@salesmaster/database';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { QrService } from '../common/qr/qr.service';
 
 @Injectable()
 export class CatalogService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly qr: QrService,
   ) {}
+
+  /** QR-encodes the SKU for label printing — scan at the register to look the item up. */
+  async getVariantQrCode(
+    tenantId: string,
+    variantId: string,
+  ): Promise<{ dataUrl: string; sku: string }> {
+    const variant = await this.prisma.client.productVariant.findFirst({
+      where: { id: variantId, tenantId },
+    });
+    if (!variant) throw new NotFoundException('Product variant not found');
+    return { dataUrl: await this.qr.toDataUrl(variant.sku), sku: variant.sku };
+  }
 
   async createProduct(tenantId: string, actorUserId: string, input: CreateProductInput) {
     const existingSkus = await this.prisma.client.productVariant.findMany({

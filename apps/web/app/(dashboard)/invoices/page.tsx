@@ -22,8 +22,6 @@ interface Branch {
   name: string;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
-
 export default function InvoicesPage() {
   const api = useTenantApi();
   const [invoices, setInvoices] = useState<Invoice[] | null>(null);
@@ -31,6 +29,10 @@ export default function InvoicesPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [sendMessage, setSendMessage] = useState<string | null>(null);
+  const [qrInvoiceId, setQrInvoiceId] = useState<string | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [form, setForm] = useState({
     customerId: '',
     description: '',
@@ -80,6 +82,42 @@ export default function InvoicesPage() {
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create invoice');
+    }
+  }
+
+  async function handleSend(invoiceId: string, channel: 'email' | 'sms') {
+    setSendingId(invoiceId);
+    setSendMessage(null);
+    try {
+      const result = await api<{ delivered: boolean; provider: string }>(
+        `/invoices/${invoiceId}/send`,
+        { method: 'POST', body: { channel } },
+      );
+      setSendMessage(
+        result.delivered
+          ? `Sent via ${result.provider}.`
+          : `Not delivered (provider "${result.provider}" is not configured for real sends in this environment).`,
+      );
+    } catch (err) {
+      setSendMessage(err instanceof Error ? err.message : `Could not send via ${channel}`);
+    } finally {
+      setSendingId(null);
+    }
+  }
+
+  async function toggleQr(invoiceId: string) {
+    if (qrInvoiceId === invoiceId) {
+      setQrInvoiceId(null);
+      setQrDataUrl(null);
+      return;
+    }
+    setQrInvoiceId(invoiceId);
+    setQrDataUrl(null);
+    try {
+      const result = await api<{ dataUrl: string }>(`/invoices/${invoiceId}/qr`);
+      setQrDataUrl(result.dataUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load QR code');
     }
   }
 
@@ -141,6 +179,8 @@ export default function InvoicesPage() {
         </form>
       )}
 
+      {sendMessage && <p className="text-sm text-gray-600 dark:text-gray-300">{sendMessage}</p>}
+
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="text-left text-xs text-gray-500">
@@ -150,10 +190,12 @@ export default function InvoicesPage() {
               <th className="p-3">Total</th>
               <th className="p-3">Paid</th>
               <th className="p-3">Public link</th>
+              <th className="p-3">Send</th>
+              <th className="p-3">QR</th>
             </tr>
           </thead>
           <tbody>
-            {invoices?.map((inv) => (
+            {invoices?.flatMap((inv) => [
               <tr key={inv.id} className="border-t border-gray-100 dark:border-gray-800">
                 <td className="p-3">{inv.number}</td>
                 <td className="p-3">{inv.status}</td>
@@ -166,15 +208,56 @@ export default function InvoicesPage() {
                 <td className="p-3">
                   <a
                     className="text-brand-600 hover:underline"
-                    href={`${API_BASE}/public/invoices/${inv.publicToken}`}
+                    href={`/public/invoices/${inv.publicToken}`}
                     target="_blank"
                     rel="noreferrer"
                   >
                     View
                   </a>
                 </td>
-              </tr>
-            ))}
+                <td className="p-3">
+                  <div className="flex gap-2">
+                    <button
+                      disabled={sendingId === inv.id}
+                      onClick={() => handleSend(inv.id, 'email')}
+                      className="text-xs text-brand-600 hover:underline disabled:opacity-50"
+                    >
+                      Email
+                    </button>
+                    <button
+                      disabled={sendingId === inv.id}
+                      onClick={() => handleSend(inv.id, 'sms')}
+                      className="text-xs text-brand-600 hover:underline disabled:opacity-50"
+                    >
+                      SMS
+                    </button>
+                  </div>
+                </td>
+                <td className="p-3">
+                  <button
+                    onClick={() => toggleQr(inv.id)}
+                    className="text-xs text-brand-600 hover:underline"
+                  >
+                    {qrInvoiceId === inv.id ? 'Hide QR' : 'QR code'}
+                  </button>
+                </td>
+              </tr>,
+              qrInvoiceId === inv.id ? (
+                <tr key={`${inv.id}-qr`} className="border-t border-gray-100 dark:border-gray-800">
+                  <td colSpan={7} className="p-3">
+                    {qrDataUrl ? (
+                      <img
+                        src={qrDataUrl}
+                        alt={`QR code for invoice ${inv.number}`}
+                        className="h-32 w-32"
+                      />
+                    ) : (
+                      <p className="text-sm text-gray-500">Loading…</p>
+                    )}
+                  </td>
+                </tr>
+              ) : null,
+            ])}
           </tbody>
         </table>
         {invoices && invoices.length === 0 && (

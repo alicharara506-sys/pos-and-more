@@ -5,6 +5,7 @@ import {
   createInvoiceSchema,
   createQuoteSchema,
   recordInvoicePaymentSchema,
+  sendInvoiceSchema,
 } from '@salesmaster/contracts';
 import { SessionAuthGuard } from '../common/guards/session-auth.guard';
 import { TenantGuard } from '../common/guards/tenant.guard';
@@ -84,6 +85,30 @@ export class InvoicesController {
     @Param('id') id: string,
   ) {
     return this.invoices.voidInvoice(tenantId, user.id, id);
+  }
+
+  @UseGuards(SessionAuthGuard, TenantGuard, RbacGuard)
+  @Get('invoices/:id/qr')
+  @RequirePermissions(PERMISSIONS.INVOICES_MANAGE)
+  async qr(@CurrentTenantId() tenantId: string, @Param('id') id: string) {
+    return this.invoices.getQrCode(tenantId, id);
+  }
+
+  @UseGuards(SessionAuthGuard, TenantGuard, RbacGuard)
+  @Post('invoices/:id/send')
+  @RequirePermissions(PERMISSIONS.INVOICES_MANAGE)
+  async send(
+    @CurrentTenantId() tenantId: string,
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(sendInvoiceSchema)) body: unknown,
+  ) {
+    return this.invoices.send(
+      tenantId,
+      user.id,
+      id,
+      body as import('@salesmaster/contracts').SendInvoiceInput,
+    );
   }
 
   @UseGuards(SessionAuthGuard, TenantGuard, RbacGuard)
