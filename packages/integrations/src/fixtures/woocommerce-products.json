@@ -1,0 +1,20 @@
+[
+  {
+    "id": 794,
+    "name": "Premium Cotton T-Shirt",
+    "sku": "TS-COTTON-BLK",
+    "price": "24.99",
+    "stock_quantity": 42,
+    "description": "<p>A soft, breathable premium cotton t-shirt.</p>",
+    "images": [{ "src": "https://example-store.test/wp-content/uploads/tshirt-black.jpg" }]
+  },
+  {
+    "id": 795,
+    "name": "Ceramic Coffee Mug",
+    "sku": "MUG-CERAMIC-WHT",
+    "price": "12.50",
+    "stock_quantity": 0,
+    "description": "<p>A 12oz ceramic coffee mug.</p>",
+    "images": [{ "src": "https://example-store.test/wp-content/uploads/mug-white.jpg" }]
+  }
+]

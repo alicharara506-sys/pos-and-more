@@ -35,11 +35,16 @@ long-term spec. Concretely, working today:
   offline mutation queue/sync engine; integration tests for tenant isolation, the billing
   acceptance tests, auth, and sale/refund ledger correctness — all run against a real Postgres
   instance, not mocks.
+- An e-commerce integration hub for WooCommerce: a provider-agnostic connector SDK
+  (`packages/integrations`) with WooCommerce built on top of it, encrypted connection
+  credentials, idempotent product/inventory sync, and signature-verified webhook ingestion
+  (HMAC-SHA256, deduped replay-safe), plus a merchant-facing integration health dashboard in
+  `apps/web` — see `docs/integrations.md` for exactly what is and isn't covered (Shopify and other
+  providers, order→sale materialization, and inbound inventory sync are explicitly out of scope
+  for this phase).
 
 **Deliberately not implemented yet** (see the relevant doc for the plan):
 
-- The e-commerce integration hub (Shopify/WooCommerce/universal connector) — see
-  `docs/integrations.md` for the intended architecture.
 - The AI sales assistant, QR code module, and scheduled/exported reports.
 - Live third-party credentials: Google/Apple OAuth, Stripe, and email/SMS providers are wired
   against their real SDKs behind typed adapters, but this environment has no real keys — every
@@ -149,6 +154,6 @@ disposable Postgres service container.
 - `docs/architecture.md` — system boundaries, major flows, decisions
 - `docs/data-model.md` — entities, relationships, tenant-isolation strategy
 - `docs/offline-sync.md` — the mobile offline-first POS: mutation queue, sync engine, conflict rules
-- `docs/integrations.md` — commerce integration hub design (not yet implemented)
+- `docs/integrations.md` — commerce integration hub: what's implemented (WooCommerce) and what isn't
 - `docs/security.md` — threat model, auth, encryption, audit policy
 - `docs/billing.md` — the exact pricing/entitlement calculation

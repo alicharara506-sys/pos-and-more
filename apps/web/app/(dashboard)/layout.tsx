@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: '/customers', label: 'Customers', icon: '👥' },
   { href: '/invoices', label: 'Invoices', icon: '📄' },
   { href: '/expenses', label: 'Expenses', icon: '💳' },
+  { href: '/integrations', label: 'Integrations', icon: '🔌' },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

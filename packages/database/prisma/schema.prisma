@@ -58,6 +58,7 @@ model Tenant {
   billingEvents    BillingEvent[]
   inventoryMovements InventoryMovement[]
   stockTransfers   StockTransfer[]
+  commerceConnections CommerceConnection[]
 
   @@index([status])
 }
@@ -962,4 +963,140 @@ model OutboxEvent {
   lastError     String?
 
   @@index([processedAt, createdAt])
+}
+
+// =============================================================================
+// Commerce integration hub — see docs/integrations.md
+// =============================================================================
+
+enum CommerceProvider {
+  WOOCOMMERCE
+  SHOPIFY
+  UNIVERSAL_REST
+}
+
+enum CommerceConnectionStatus {
+  PENDING // authorized() succeeded but no successful sync yet
+  CONNECTED
+  ERROR
+  DISCONNECTED
+}
+
+enum SyncDataDomain {
+  PRODUCTS
+  INVENTORY
+  ORDERS
+  CUSTOMERS
+}
+
+enum SyncSourceOfTruth {
+  SALESMASTER
+  EXTERNAL
+}
+
+model CommerceConnection {
+  id                String                    @id @default(uuid())
+  tenantId          String
+  tenant            Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  provider          CommerceProvider
+  name              String // merchant-facing label, e.g. "Main Shopify store"
+  storeUrl          String?
+  // Provider credentials (API keys, OAuth tokens, webhook secrets) — AES-256-GCM
+  // encrypted with the same EncryptionService used for OAuth provider tokens
+  // (apps/api/src/common/crypto). Never stored or logged in plaintext.
+  credentialsEncrypted String
+  // Per-domain sync configuration: direction (one-way/two-way) and source of
+  // truth, e.g. { "inventory": { "sourceOfTruth": "SALESMASTER", "direction": "PUSH" } }
+  syncConfig        Json                      @default("{}")
+  status            CommerceConnectionStatus  @default(PENDING)
+  lastSyncAt        DateTime?
+  lastErrorAt       DateTime?
+  lastError         String?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  externalObjectMaps ExternalObjectMap[]
+  syncJobs           SyncJob[]
+  webhookDeliveries  WebhookDelivery[]
+
+  @@index([tenantId, provider])
+}
+
+enum ExternalObjectType {
+  PRODUCT
+  VARIANT
+  ORDER
+  CUSTOMER
+}
+
+// Maps a provider's external id to our canonical record id, so a replayed
+// webhook or a re-run historical import updates the existing mapped record
+// instead of recreating it (spec §13.4).
+model ExternalObjectMap {
+  id            String              @id @default(uuid())
+  tenantId      String
+  connectionId  String
+  connection    CommerceConnection  @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  externalType  ExternalObjectType
+  externalId    String
+  canonicalType String // "Product" | "ProductVariant" | "Sale" | "Customer"
+  canonicalId   String
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@unique([connectionId, externalType, externalId])
+  @@index([tenantId, canonicalType, canonicalId])
+}
+
+enum SyncJobStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum SyncDirection {
+  PULL
+  PUSH
+}
+
+// One row per sync attempt for one (connection, domain, direction) —
+// gives the merchant-facing integration health dashboard its "last
+// success, last error, latency, queue depth" data (spec §13.4).
+model SyncJob {
+  id             String             @id @default(uuid())
+  tenantId       String
+  connectionId   String
+  connection     CommerceConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  domain         SyncDataDomain
+  direction      SyncDirection
+  status         SyncJobStatus      @default(PENDING)
+  cursor         String?
+  itemsProcessed Int                @default(0)
+  error          String?
+  startedAt      DateTime           @default(now())
+  finishedAt     DateTime?
+
+  @@index([tenantId, connectionId, domain])
+  @@index([status, startedAt])
+}
+
+// Raw inbound webhook payloads, retained for a bounded traceability window.
+// externalEventId dedup makes webhook processing idempotent — a replayed
+// delivery is a harmless no-op (spec §13.4 / acceptance test #8).
+model WebhookDelivery {
+  id               String             @id @default(uuid())
+  tenantId         String
+  connectionId     String
+  connection       CommerceConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  externalEventId  String
+  eventType        String
+  payload          Json
+  signatureVerified Boolean           @default(false)
+  processedAt      DateTime?
+  error            String?
+  receivedAt       DateTime           @default(now())
+
+  @@unique([connectionId, externalEventId])
+  @@index([tenantId, connectionId, receivedAt])
 }

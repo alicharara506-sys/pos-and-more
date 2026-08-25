@@ -7,3 +7,4 @@ export * from './customers';
 export * from './sales';
 export * from './invoices';
 export * from './expenses';
+export * from './integrations';

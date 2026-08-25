@@ -1,15 +1,29 @@
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
+import express from 'express';
 import request from 'supertest';
 import { randomUUID } from 'node:crypto';
 import { AppModule } from '../../src/app.module';
 
+const API_PREFIX = 'api/v1';
+
+/**
+ * Mirrors main.ts's bootstrap exactly (bodyParser: false + explicit
+ * express.raw()/json() wiring), so webhook routes see the same raw-Buffer
+ * body here as they do in production — otherwise signature verification
+ * bugs (or fixes) would go untested.
+ */
 export async function createTestApp(): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  const app = moduleRef.createNestApplication();
+  const app = moduleRef.createNestApplication<NestExpressApplication>({ bodyParser: false });
   app.use(cookieParser());
-  app.setGlobalPrefix('api/v1', { exclude: ['health'] });
+  app.use(`/${API_PREFIX}/billing/webhooks/stripe`, express.raw({ type: 'application/json' }));
+  app.use(`/${API_PREFIX}/integrations/webhooks`, express.raw({ type: 'application/json' }));
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+  app.setGlobalPrefix(API_PREFIX, { exclude: ['health'] });
   await app.init();
   return app;
 }

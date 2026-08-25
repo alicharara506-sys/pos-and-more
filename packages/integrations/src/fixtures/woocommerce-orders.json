@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1042,
+    "number": "1042",
+    "status": "processing",
+    "currency": "USD",
+    "total": "37.49",
+    "total_tax": "2.50",
+    "shipping_total": "5.00",
+    "date_created": "2026-08-01T14:32:00",
+    "billing": { "email": "customer@example.test" },
+    "line_items": [
+      { "name": "Premium Cotton T-Shirt", "sku": "TS-COTTON-BLK", "quantity": 1, "price": "24.99" },
+      { "name": "Ceramic Coffee Mug", "sku": "MUG-CERAMIC-WHT", "quantity": 1, "price": "12.50" }
+    ]
+  }
+]

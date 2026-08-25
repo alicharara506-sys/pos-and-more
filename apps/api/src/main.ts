@@ -17,15 +17,23 @@ async function bootstrap() {
   app.use(helmet());
   app.use(cookieParser());
 
-  // Stripe webhook signature verification needs the raw request body, so
-  // this route is exempted from the global JSON parser (must be registered
-  // before express.json()).
-  app.use('/billing/webhooks/stripe', express.raw({ type: 'application/json' }));
+  // Stripe/commerce-connector webhook signature verification needs the raw
+  // request body, so these routes are exempted from the global JSON parser
+  // (must be registered before express.json()). The mount path MUST include
+  // the global API prefix below — app.use() matches against the actual
+  // incoming request path, which already carries that prefix by the time it
+  // reaches Express; registering the exemption without it silently never
+  // matches, and the route falls through to express.json() parsing the body
+  // into an object instead of leaving it as the Buffer signature
+  // verification requires.
+  const API_PREFIX = 'api/v1';
+  app.use(`/${API_PREFIX}/billing/webhooks/stripe`, express.raw({ type: 'application/json' }));
+  app.use(`/${API_PREFIX}/integrations/webhooks`, express.raw({ type: 'application/json' }));
   app.use(express.json());
   app.use(express.urlencoded({ extended: true })); // Apple's form_post OAuth callback
 
   app.enableCors({ origin: env.APP_URL, credentials: true });
-  app.setGlobalPrefix('api/v1', { exclude: ['health'] });
+  app.setGlobalPrefix(API_PREFIX, { exclude: ['health'] });
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('SalesMaster Pro API')
